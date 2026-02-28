@@ -1,10 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getCategories } from '../services/categoryService'
 
-/**
- * Fetch all categories
- * @returns {Object} { categories, loading, error }
- */
+
 export function useCategories() {
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
@@ -22,6 +19,7 @@ export function useCategories() {
       }
     }
     fetchCategories()
+    console.log('Fetched categories:', categories) // Debug log
   }, [])
 
   return { categories, loading, error }
