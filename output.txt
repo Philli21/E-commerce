@@ -1,89 +1,34 @@
+\n===== ./eslint.config.js =====\n
+import js from '@eslint/js'
+import globals from 'globals'
+import reactHooks from 'eslint-plugin-react-hooks'
+import reactRefresh from 'eslint-plugin-react-refresh'
+import { defineConfig, globalIgnores } from 'eslint/config'
 
-===== src/App.jsx =====
-
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import Layout from './components/Layout'
-import ProtectedRoute from './components/auth/ProtectedRoute'
-
-// Existing pages
-import Home from './pages/Home'
-import Login from './pages/auth/Login'
-import Register from './pages/Register'
-import ListingDetail from './pages/ListingDetail'
-import Profile from './pages/Profile'
-import Chat from './pages/Chat'
-import CompleteProfile from './pages/auth/CompleteProfile'
-import PostAd from './pages/PostAd'
-import CategoryPage from './pages/CategoryPage'
-import SearchPage from './pages/SearchPage'
-
-// New pages
-import MyListings from './pages/MyListings'
-import Favorites from './pages/Favorites'
-import SellerProfile from './pages/SellerProfile'
-
-function App() {
-  return (
-    <BrowserRouter>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/complete-profile" element={<CompleteProfile />} />
-          <Route
-            path="/post-ad"
-            element={
-              <ProtectedRoute requireCompleteProfile>
-                <PostAd />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/listing/:id" element={<ListingDetail />} />
-          <Route path="/category/:slug" element={<CategoryPage />} />
-          <Route path="/search" element={<SearchPage />} />
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/my-listings"
-            element={
-              <ProtectedRoute>
-                <MyListings />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/favorites"
-            element={
-              <ProtectedRoute>
-                <Favorites />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/seller/:userId" element={<SellerProfile />} />
-          <Route
-            path="/chat"
-            element={
-              <ProtectedRoute>
-                <Chat />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </Layout>
-    </BrowserRouter>
-  )
-}
-
-export default App
-===== src/main.jsx =====
-
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{js,jsx}'],
+    extends: [
+      js.configs.recommended,
+      reactHooks.configs.flat.recommended,
+      reactRefresh.configs.vite,
+    ],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: globals.browser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        ecmaFeatures: { jsx: true },
+        sourceType: 'module',
+      },
+    },
+    rules: {
+      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+    },
+  },
+])
+\n===== ./src/main.jsx =====\n
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
@@ -96,21 +41,21 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <App />
     </AuthProvider>
   </React.StrictMode>
-)
-===== src/components/Navbar.jsx =====
-
+)\n===== ./src/components/Navbar.jsx =====\n
 import { Link, useNavigate } from 'react-router-dom'
-import { Menu, X, User, LogOut, PlusCircle, Search, Heart } from 'lucide-react'
+import { Menu, X, User, LogOut, PlusCircle, Search, Heart, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useFavorites } from '../hooks/useFavorites'
 import CategoryDropdown from './categories/CategoryDropdown'
 import SearchBar from './search/SearchBar'
+//import {  Loader2} from 'lucide-react';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [signingOut, setSigningOut] = useState(false)
   const { user, profile, signOut } = useAuth()
   const { favoritesCount } = useFavorites()
   const navigate = useNavigate()
@@ -123,14 +68,20 @@ const Navbar = () => {
   }
 
   const handleSignOut = async () => {
+    setSigningOut(true);
     try {
-      await signOut()
-      navigate('/')
+      await signOut();
+      // Small delay to allow state to propagate
+      setTimeout(() => {
+        navigate('/', { replace: true });
+      }, 100);
     } catch (error) {
-      console.error('Sign out failed:', error)
+      console.error('Sign out failed:', error);
+      // You could show a toast here
+    } finally {
+      setSigningOut(false);
     }
-  }
-
+  };
   return (
     <nav className="bg-primary text-white shadow-lg sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -148,7 +99,7 @@ const Navbar = () => {
           {/* Desktop Menu */}
           <div className="hidden md:flex items-center space-x-4">
             <CategoryDropdown />
-            <SearchBar />
+            
             {/* Search form */}
             <form onSubmit={handleSearch} className="relative">
               <input
@@ -228,9 +179,14 @@ const Navbar = () => {
                       </Link>
                       <button
                         onClick={handleSignOut}
-                        className="block w-full text-left px-4 py-2 text-sm hover:bg-slate-50 text-error"
+                        disabled={signingOut}
+                        className="block w-full text-left px-4 py-2 text-sm hover:bg-slate-50 text-error disabled:opacity-50"
                       >
-                        <LogOut className="w-4 h-4 inline mr-2" />
+                        {signingOut ? (
+                          <Loader2 className="w-4 h-4 inline mr-2 animate-spin" />
+                        ) : (
+                          <LogOut className="w-4 h-4 inline mr-2" />
+                        )}
                         Sign Out
                       </button>
                     </div>
@@ -310,12 +266,17 @@ const Navbar = () => {
                 </Link>
                 <button
                   onClick={() => {
-                    handleSignOut()
-                    setIsOpen(false)
+                    handleSignOut();
+                    setIsOpen(false);
                   }}
-                  className="block w-full text-left px-3 py-2 rounded-md hover:bg-primary-600 transition"
+                  disabled={signingOut}
+                  className="block w-full text-left px-3 py-2 rounded-md hover:bg-primary-600 transition disabled:opacity-50"
                 >
-                  Sign Out
+                  {signingOut ? (
+                    <Loader2 className="w-4 h-4 inline mr-2 animate-spin" />
+                  ) : (
+                    'Sign Out'
+                  )}
                 </button>
               </>
             ) : (
@@ -343,9 +304,7 @@ const Navbar = () => {
   )
 }
 
-export default Navbar
-===== src/components/Layout.jsx =====
-
+export default Navbar\n===== ./src/components/Layout.jsx =====\n
 import Navbar from './Navbar'
 import Footer from './Footer' // we'll create next
 
@@ -367,9 +326,7 @@ const Layout = ({ children }) => {
   )
 }
 
-export default Layout
-===== src/components/Footer.jsx =====
-
+export default Layout\n===== ./src/components/Footer.jsx =====\n
 /**
  * Simple footer
  * @returns {JSX.Element}
@@ -385,9 +342,7 @@ const Footer = () => {
   )
 }
 
-export default Footer
-===== src/components/Hero.jsx =====
-
+export default Footer\n===== ./src/components/Hero.jsx =====\n
 import { Search } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -453,9 +408,7 @@ const Hero = () => {
   )
 }
 
-export default Hero
-===== src/components/auth/ProtectedRoute.jsx =====
-
+export default Hero\n===== ./src/components/auth/ProtectedRoute.jsx =====\n
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { Loader2 } from 'lucide-react'
@@ -492,9 +445,7 @@ const ProtectedRoute = ({ children, requireCompleteProfile = false }) => {
   return children
 }
 
-export default ProtectedRoute
-===== src/components/categories/CategoryGrid.jsx =====
-
+export default ProtectedRoute\n===== ./src/components/categories/CategoryGrid.jsx =====\n
 import { Link } from 'react-router-dom'
 import { useCategories } from '../../hooks/useCategories'
 import * as Icons from 'lucide-react'
@@ -541,9 +492,7 @@ const CategoryGrid = () => {
   )
 }
 
-export default CategoryGrid
-===== src/components/categories/CategoryDropdown.jsx =====
-
+export default CategoryGrid\n===== ./src/components/categories/CategoryDropdown.jsx =====\n
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
@@ -615,9 +564,7 @@ const CategoryDropdown = () => {
   )
 }
 
-export default CategoryDropdown
-===== src/components/categories/CategoryPage.jsx =====
-
+export default CategoryDropdown\n===== ./src/components/categories/CategoryPage.jsx =====\n
 import { useParams } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { getCategoryBySlug } from '../services/categoryService'
@@ -661,9 +608,7 @@ const CategoryPage = () => {
   )
 }
 
-export default CategoryPage
-===== src/components/listings/ListingCard.jsx =====
-
+export default CategoryPage\n===== ./src/components/listings/ListingCard.jsx =====\n
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { MapPin, Heart } from 'lucide-react'
@@ -770,9 +715,7 @@ const ListingCard = ({ listing }) => {
   )
 }
 
-export default ListingCard
-===== src/components/listings/ListingGrid.jsx =====
-
+export default ListingCard\n===== ./src/components/listings/ListingGrid.jsx =====\n
 import { useState, useEffect } from 'react'
 import ListingCard from './ListingCard'
 import { getListings } from '../../services/listingService'
@@ -850,9 +793,7 @@ const ListingGrid = ({ categoryId, filters = {} }) => {
   )
 }
 
-export default ListingGrid
-===== src/components/listings/ListingManagementCard.jsx =====
-
+export default ListingGrid\n===== ./src/components/listings/ListingManagementCard.jsx =====\n
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Edit2, CheckCircle, PauseCircle, Trash2, Loader2 } from 'lucide-react'
@@ -974,9 +915,7 @@ const ListingManagementCard = ({ listing }) => {
   )
 }
 
-export default ListingManagementCard
-===== src/components/listings/ImageGallery.jsx =====
-
+export default ListingManagementCard\n===== ./src/components/listings/ImageGallery.jsx =====\n
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 
@@ -1066,9 +1005,7 @@ const ImageGallery = ({ images }) => {
   )
 }
 
-export default ImageGallery
-===== src/components/listings/SellerCard.jsx =====
-
+export default ImageGallery\n===== ./src/components/listings/SellerCard.jsx =====\n
 import { Link } from 'react-router-dom'
 import { Calendar } from 'lucide-react'
 import { format } from 'date-fns'
@@ -1111,9 +1048,7 @@ const SellerCard = ({ seller }) => {
   )
 }
 
-export default SellerCard
-===== src/components/listings/SimilarListings.jsx =====
-
+export default SellerCard\n===== ./src/components/listings/SimilarListings.jsx =====\n
 import { useState, useEffect } from 'react'
 import { getListings } from '../../services/listingService'
 import ListingCard from './ListingCard'
@@ -1144,9 +1079,7 @@ const SimilarListings = ({ categoryId, currentId }) => {
   )
 }
 
-export default SimilarListings
-===== src/components/search/FilterSidebar.jsx =====
-
+export default SimilarListings\n===== ./src/components/search/FilterSidebar.jsx =====\n
 import { useState } from 'react'
 import { ETHIOPIAN_CITIES } from '../../utils/constants' // define elsewhere
 
@@ -1213,9 +1146,7 @@ const FilterSidebar = ({ categoryId }) => {
   )
 }
 
-export default FilterSidebar
-===== src/components/search/SortDropdown.jsx =====
-
+export default FilterSidebar\n===== ./src/components/search/SortDropdown.jsx =====\n
 const SORT_OPTIONS = [
   { value: 'created_at_desc', label: 'Newest' },
   { value: 'price_asc', label: 'Price: Low to High' },
@@ -1247,9 +1178,7 @@ const SortDropdown = ({ filters, setFilters }) => {
   )
 }
 
-export default SortDropdown
-===== src/components/search/ActiveFilters.jsx =====
-
+export default SortDropdown\n===== ./src/components/search/ActiveFilters.jsx =====\n
 import { X } from 'lucide-react'
 
 /**
@@ -1307,9 +1236,7 @@ const ActiveFilters = ({ filters, setFilters }) => {
   )
 }
 
-export default ActiveFilters
-===== src/components/search/SearchBar.jsx =====
-
+export default ActiveFilters\n===== ./src/components/search/SearchBar.jsx =====\n
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search } from 'lucide-react'
@@ -1341,9 +1268,7 @@ const SearchBar = () => {
   )
 }
 
-export default SearchBar
-===== src/components/profile/EditProfileModal.jsx =====
-
+export default SearchBar\n===== ./src/components/profile/EditProfileModal.jsx =====\n
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import useUserStore from '../../stores/userStore'
@@ -1553,9 +1478,7 @@ const EditProfileModal = ({ isOpen, onClose, profile }) => {
   )
 }
 
-export default EditProfileModal
-===== src/components/post-ad/StepCategory.jsx =====
-
+export default EditProfileModal\n===== ./src/components/post-ad/StepCategory.jsx =====\n
 import { useCategories } from '../../hooks/useCategories'
 import * as Icons from 'lucide-react'
 
@@ -1595,9 +1518,7 @@ const StepCategory = ({ formData, updateForm, onNext }) => {
   )
 }
 
-export default StepCategory
-===== src/components/post-ad/StepDetails.jsx =====
-
+export default StepCategory\n===== ./src/components/post-ad/StepDetails.jsx =====\n
 import { useState } from 'react'
 import { MapPin, DollarSign } from 'lucide-react'
 
@@ -1739,9 +1660,7 @@ const StepDetails = ({ formData, updateForm, onNext, onBack }) => {
   )
 }
 
-export default StepDetails
-===== src/components/post-ad/StepImages.jsx =====
-
+export default StepDetails\n===== ./src/components/post-ad/StepImages.jsx =====\n
 import { useState, useRef } from 'react'
 import { Upload, X, Star } from 'lucide-react'
 
@@ -1865,9 +1784,7 @@ const StepImages = ({ formData, updateForm, onSubmit, onBack, submitting }) => {
   )
 }
 
-export default StepImages
-===== src/pages/Home.jsx =====
-
+export default StepImages\n===== ./src/pages/Home.jsx =====\n
 import Hero from '../components/Hero'
 import CategoryGrid from '../components/categories/CategoryGrid'
 import ListingGrid from '../components/listings/ListingGrid'
@@ -1921,9 +1838,7 @@ const Home = () => {
   )
 }
 
-export default Home
-===== src/pages/Register.jsx =====
-
+export default Home\n===== ./src/pages/Register.jsx =====\n
 const Register = () => {
   return (
     <div className="max-w-md mx-auto">
@@ -1933,9 +1848,7 @@ const Register = () => {
   );
 };
 export default Register;
-
-===== src/pages/PostAd.jsx =====
-
+\n===== ./src/pages/PostAd.jsx =====\n
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -2031,9 +1944,7 @@ const PostAd = () => {
   )
 }
 
-export default PostAd
-===== src/pages/ListingDetail.jsx =====
-
+export default PostAd\n===== ./src/pages/ListingDetail.jsx =====\n
 import { useParams } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { getListingById } from '../services/listingService'
@@ -2151,9 +2062,7 @@ const ListingDetail = () => {
   )
 }
 
-export default ListingDetail
-===== src/pages/Profile.jsx =====
-
+export default ListingDetail\n===== ./src/pages/Profile.jsx =====\n
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import useUserStore from '../stores/userStore'
@@ -2311,9 +2220,7 @@ const Profile = () => {
   )
 }
 
-export default Profile
-===== src/pages/Chat.jsx =====
-
+export default Profile\n===== ./src/pages/Chat.jsx =====\n
 const Chat = () => {
   return (
     <div>
@@ -2323,9 +2230,7 @@ const Chat = () => {
   );
 };
 export default Chat;
-
-===== src/pages/auth/Login.jsx =====
-
+\n===== ./src/pages/auth/Login.jsx =====\n
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { LogIn } from 'lucide-react'
@@ -2386,9 +2291,7 @@ const Login = () => {
   )
 }
 
-export default Login
-===== src/pages/auth/CompleteProfile.jsx =====
-
+export default Login\n===== ./src/pages/auth/CompleteProfile.jsx =====\n
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -2590,9 +2493,7 @@ const CompleteProfile = () => {
   )
 }
 
-export default CompleteProfile
-===== src/pages/CategoryPage.jsx =====
-
+export default CompleteProfile\n===== ./src/pages/CategoryPage.jsx =====\n
 import { useParams } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { getCategoryBySlug } from '../services/categoryService'
@@ -2636,9 +2537,7 @@ const CategoryPage = () => {
   )
 }
 
-export default CategoryPage
-===== src/pages/SearchPage.jsx =====
-
+export default CategoryPage\n===== ./src/pages/SearchPage.jsx =====\n
 import { useSearchParams } from 'react-router-dom'
 import ListingGrid from '../components/listings/ListingGrid'
 
@@ -2656,9 +2555,7 @@ const SearchPage = () => {
   )
 }
 
-export default SearchPage
-===== src/pages/MyListings.jsx =====
-
+export default SearchPage\n===== ./src/pages/MyListings.jsx =====\n
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import useListingsStore from '../stores/listingsStore'
@@ -2749,9 +2646,7 @@ const MyListings = () => {
   )
 }
 
-export default MyListings
-===== src/pages/Favorites.jsx =====
-
+export default MyListings\n===== ./src/pages/Favorites.jsx =====\n
 import { useFavorites } from '../hooks/useFavorites'
 import ListingGrid from '../components/listings/ListingGrid'
 import { Heart } from 'lucide-react'
@@ -2798,9 +2693,7 @@ const Favorites = () => {
   )
 }
 
-export default Favorites
-===== src/pages/SellerProfile.jsx =====
-
+export default Favorites\n===== ./src/pages/SellerProfile.jsx =====\n
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { getPublicProfile, getSellerListings, reportSeller } from '../services/userService'
@@ -2938,9 +2831,299 @@ const SellerProfile = () => {
   )
 }
 
-export default SellerProfile
-===== src/hooks/useListings.js =====
+export default SellerProfile\n===== ./src/pages/EditListing.jsx =====\n
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { getListingById, updateListing } from '../services/listingService';
+import { Loader2, X, Star, Upload } from 'lucide-react';
 
+// Reuse step components from PostAd (or create dedicated ones)
+import StepCategory from '../components/post-ad/StepCategory';
+import StepDetails from '../components/post-ad/StepDetails';
+
+const ETHIOPIAN_CITIES = [
+  'Addis Ababa', 'Dire Dawa', 'Mekelle', 'Gondar', 'Bahir Dar',
+  'Hawassa', 'Adama', 'Jimma', 'Jijiga', 'Dessie', 'Others'
+];
+
+const steps = ['Category', 'Details', 'Images'];
+
+const EditListing = () => {
+  const { id } = useParams();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [currentStep, setCurrentStep] = useState(0);
+  const [formData, setFormData] = useState({
+    category_id: null,
+    title: '',
+    description: '',
+    price: '',
+    price_negotiable: true,
+    condition: 'used',
+    location: '',
+    existingImages: [],        // from DB: { id, image_url, is_primary, display_order }
+    newImages: [],             // File objects for new uploads
+    removedImageIds: [],       // IDs of images to delete
+  });
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  // Fetch listing data
+  useEffect(() => {
+    const fetchListing = async () => {
+      try {
+        const data = await getListingById(id);
+        // Ensure user owns this listing (protect route)
+        if (data.user_id !== user?.id) {
+          navigate('/my-listings');
+          return;
+        }
+        setFormData({
+          category_id: data.category_id,
+          title: data.title,
+          description: data.description,
+          price: data.price,
+          price_negotiable: data.price_negotiable,
+          condition: data.condition,
+          location: data.location,
+          existingImages: data.listing_images || [],
+          newImages: [],
+          removedImageIds: [],
+        });
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchListing();
+  }, [id, user, navigate]);
+
+  const updateForm = (updates) => setFormData(prev => ({ ...prev, ...updates }));
+
+  const handleNext = () => setCurrentStep(i => i + 1);
+  const handleBack = () => setCurrentStep(i => i - 1);
+
+  // ---- Image management for step 2 ----
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files);
+    const totalImages = formData.existingImages.length + formData.newImages.length + files.length;
+    if (totalImages > 8) {
+      alert('Maximum 8 images allowed');
+      return;
+    }
+    updateForm({ newImages: [...formData.newImages, ...files] });
+  };
+
+  const removeExistingImage = (imageId) => {
+    updateForm({
+      existingImages: formData.existingImages.filter(img => img.id !== imageId),
+      removedImageIds: [...formData.removedImageIds, imageId]
+    });
+  };
+
+  const removeNewImage = (index) => {
+    updateForm({
+      newImages: formData.newImages.filter((_, i) => i !== index)
+    });
+  };
+
+  const setPrimaryImage = (imageIdOrIndex, type) => {
+    if (type === 'existing') {
+      const updated = formData.existingImages.map(img => ({
+        ...img,
+        is_primary: img.id === imageIdOrIndex
+      }));
+      updateForm({ existingImages: updated });
+    } else {
+      // For new images, we'll handle primary flag on submit
+      // We could reorder newImages, but it's simpler to let first new image be primary if no existing
+    }
+  };
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    try {
+      await updateListing(id, formData);
+      navigate('/my-listings');
+    } catch (err) {
+      setError(err.message);
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="text-center py-12 text-error">{error}</div>;
+  }
+
+  // Render step components
+  const stepProps = {
+    formData,
+    updateForm,
+    onNext: handleNext,
+    onBack: handleBack,
+    isLastStep: currentStep === steps.length - 1,
+  };
+
+  const renderStep = () => {
+    switch (currentStep) {
+      case 0:
+        return <StepCategory {...stepProps} />;
+      case 1:
+        return <StepDetails {...stepProps} />;
+      case 2:
+        return (
+          <div>
+            <h2 className="text-2xl font-bold text-text mb-6">Manage Images</h2>
+            <p className="text-text-light mb-4">Up to 8 images. First image is the cover.</p>
+
+            {/* Existing images */}
+            {formData.existingImages.length > 0 && (
+              <div className="mb-6">
+                <h3 className="font-semibold mb-2">Current Images</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {formData.existingImages.map((img) => (
+                    <div key={img.id} className="relative group">
+                      <img
+                        src={img.image_url}
+                        alt="Listing"
+                        className="w-full h-32 object-cover rounded-lg"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition rounded-lg flex items-center justify-center gap-2">
+                        {!img.is_primary && (
+                          <button
+                            onClick={() => setPrimaryImage(img.id, 'existing')}
+                            className="p-1 bg-white rounded-full hover:bg-secondary"
+                            title="Set as cover"
+                          >
+                            <Star className="w-4 h-4 text-text" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => removeExistingImage(img.id)}
+                          className="p-1 bg-white rounded-full hover:bg-error"
+                          title="Remove"
+                        >
+                          <X className="w-4 h-4 text-text" />
+                        </button>
+                      </div>
+                      {img.is_primary && (
+                        <span className="absolute top-2 left-2 bg-secondary text-white text-xs px-2 py-1 rounded">
+                          Cover
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* New image uploads */}
+            <div className="mb-6">
+              <h3 className="font-semibold mb-2">Add New Images</h3>
+              <div
+                className="border-2 border-dashed border-slate-200 rounded-lg p-6 text-center cursor-pointer hover:border-primary"
+                onClick={() => document.getElementById('image-upload').click()}
+              >
+                <Upload className="w-8 h-8 text-text-light mx-auto mb-2" />
+                <p className="text-text-light">Click to upload or drag & drop</p>
+                <input
+                  id="image-upload"
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+              </div>
+
+              {formData.newImages.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                  {formData.newImages.map((file, idx) => (
+                    <div key={idx} className="relative group">
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt="New preview"
+                        className="w-full h-32 object-cover rounded-lg"
+                      />
+                      <button
+                        onClick={() => removeNewImage(idx)}
+                        className="absolute top-1 right-1 p-1 bg-white rounded-full hover:bg-error"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-between pt-6">
+              <button
+                onClick={handleBack}
+                className="px-6 py-2 border border-slate-200 rounded-lg hover:bg-slate-50"
+                disabled={submitting}
+              >
+                Back
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="bg-secondary hover:bg-secondary-600 text-white px-6 py-2 rounded-lg disabled:opacity-50 flex items-center gap-2"
+              >
+                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto py-8 px-4">
+      {/* Stepper */}
+      <div className="mb-8">
+        <div className="flex justify-between items-center">
+          {steps.map((step, idx) => (
+            <div key={idx} className="flex items-center flex-1 last:flex-none">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold ${
+                  idx <= currentStep
+                    ? 'bg-primary text-white'
+                    : 'bg-slate-200 text-text-light'
+                }`}
+              >
+                {idx + 1}
+              </div>
+              <span className={`ml-2 text-sm ${idx === currentStep ? 'font-medium text-text' : 'text-text-light'}`}>
+                {step}
+              </span>
+              {idx < steps.length - 1 && (
+                <div className={`flex-1 h-0.5 mx-4 ${idx < currentStep ? 'bg-primary' : 'bg-slate-200'}`} />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {renderStep()}
+    </div>
+  );
+};
+
+export default EditListing;\n===== ./src/hooks/useListings.js =====\n
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../services/supabaseClient'
 
@@ -3034,9 +3217,7 @@ export function useListings(initialFilters = {}) {
   }
 
   return { listings, loading, error, pagination, refetch }
-}
-===== src/hooks/useListing.js =====
-
+}\n===== ./src/hooks/useListing.js =====\n
 import { useState, useEffect } from 'react'
 import { getListingById } from '../services/listingService'
 
@@ -3069,9 +3250,7 @@ export function useListing(id) {
   }, [id])
 
   return { listing, loading, error, refetch: fetchListing }
-}
-===== src/hooks/useCategories.js =====
-
+}\n===== ./src/hooks/useCategories.js =====\n
 import { useState, useEffect } from 'react'
 import { getCategories } from '../services/categoryService'
 
@@ -3097,9 +3276,7 @@ export function useCategories() {
   }, [])
 
   return { categories, loading, error }
-}
-===== src/hooks/useFavorites.js =====
-
+}\n===== ./src/hooks/useFavorites.js =====\n
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../services/supabaseClient'
 import { useAuth } from '../context/AuthContext'
@@ -3187,9 +3364,7 @@ export function useFavorites() {
   const favoritesCount = favorites.length
 
   return { favorites, loading, toggleFavorite, isFavorited, favoritesCount }
-}
-===== src/context/AuthContext.jsx =====
-
+}\n===== ./src/context/AuthContext.jsx =====\n
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 
@@ -3293,27 +3468,30 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
- const signOut = async () => {
-  console.log('[Auth] signOut called');
-  setLoading(true);
-  try {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error('[Auth] signOut error:', error);
+  const signOut = async () => {
+    console.log('[Auth] signOut called');
+    setLoading(true);
+    try {
+      // Attempt to sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('[Auth] signOut error:', error);
+        // Even if Supabase fails, we should still clear local state
+        // (maybe network issue, but user wants to be logged out locally)
+      }
+      // Always clear local state regardless of Supabase response
+      setUser(null);
+      setProfile(null);
+      console.log('[Auth] local state cleared');
+    } catch (err) {
+      console.error('[Auth] signOut exception:', err);
+      // Still clear local state
+      setUser(null);
+      setProfile(null);
+    } finally {
       setLoading(false);
-      throw error;
     }
-    console.log('[Auth] signOut successful');
-    setUser(null);
-    setProfile(null);
-    setLoading(false);
-  } catch (err) {
-    console.error('[Auth] signOut exception:', err);
-    setLoading(false);
-    throw err;
-  }
-};
-
+  };
   /**
    * Update profile fields and refresh local state
    * @param {Object} updates
@@ -3362,16 +3540,137 @@ export const useAuth = () => {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-};
-===== src/services/supabaseClient.js =====
-
+};\n===== ./src/services/supabaseClient.js =====\n
 import { createClient } from '@supabase/supabase-js'
+
 export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
   import.meta.env.VITE_SUPABASE_ANON_KEY
-)
-===== src/services/listingService.js =====
+)\n===== ./src/services/categoryService.js =====\n
+import { supabase } from './supabaseClient'
 
+/**
+ * Fetch all categories with optional parent filter
+ * @param {number|null} parentId - If null, fetch main categories
+ * @returns {Promise<Array>}
+ */
+export async function getCategories(parentId = null) {
+  let query = supabase.from('categories').select('*').order('display_order')
+  if (parentId === null) {
+    query = query.is('parent_id', null)
+  } else {
+    query = query.eq('parent_id', parentId)
+  }
+  const { data, error } = await query
+  if (error) throw error
+  return data
+}
+
+/**
+ * Get a single category by slug
+ * @param {string} slug
+ * @returns {Promise<Object>}
+ */
+export async function getCategoryBySlug(slug) {
+  const { data, error } = await supabase
+    .from('categories')
+    .select('*')
+    .eq('slug', slug)
+    .single()
+  if (error) throw error
+  return data
+}\n===== ./src/services/favoriteService.js =====\n
+import { supabase } from './supabaseClient'
+
+/**
+ * Add a listing to favorites
+ * @param {string} listingId
+ * @returns {Promise<Object>}
+ */
+export async function addFavorite(listingId) {
+  const { data, error } = await supabase
+    .from('favorites')
+    .insert({ listing_id: listingId })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+/**
+ * Remove a listing from favorites
+ * @param {string} listingId
+ * @returns {Promise<void>}
+ */
+export async function removeFavorite(listingId) {
+  const { error } = await supabase
+    .from('favorites')
+    .delete()
+    .eq('listing_id', listingId)
+  if (error) throw error
+}
+
+/**
+ * Check if a listing is favorited by current user
+ * @param {string} listingId
+ * @returns {Promise<boolean>}
+ */
+export async function isFavorite(listingId) {
+  const { data, error } = await supabase
+    .from('favorites')
+    .select('id')
+    .eq('listing_id', listingId)
+    .single()
+  if (error && error.code !== 'PGRST116') throw error // PGRST116 = no rows
+  return !!data
+}\n===== ./src/services/userService.js =====\n
+import { supabase } from './supabaseClient'
+
+/**
+ * Get public profile by user ID
+ * @param {string} userId
+ * @returns {Promise<Object>}
+ */
+export async function getPublicProfile(userId) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, avatar_url, location, created_at')
+    .eq('id', userId)
+    .single()
+  if (error) throw error
+  return data
+}
+
+/**
+ * Get seller's active listings
+ * @param {string} userId
+ * @returns {Promise<Array>}
+ */
+export async function getSellerListings(userId) {
+  const { data, error } = await supabase
+    .from('listings')
+    .select(`
+      *,
+      listing_images (image_url, is_primary)
+    `)
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data
+}
+
+/**
+ * Report a seller (placeholder)
+ * @param {string} sellerId
+ * @param {string} reason
+ */
+export async function reportSeller(sellerId, reason) {
+  // This would typically insert into a reports table
+  console.log('Report seller:', sellerId, reason)
+  // For now, just log
+  return { success: true }
+}\n===== ./src/services/listingService.js =====\n
 import { supabase } from './supabaseClient'
 
 /**
@@ -3544,145 +3843,11 @@ export async function deleteListing(id) {
     })
     await supabase.storage.from('listing-images').remove(paths)
   }
-}
-===== src/services/categoryService.js =====
-
-import { supabase } from './supabaseClient'
-
-/**
- * Fetch all categories with optional parent filter
- * @param {number|null} parentId - If null, fetch main categories
- * @returns {Promise<Array>}
- */
-export async function getCategories(parentId = null) {
-  let query = supabase.from('categories').select('*').order('display_order')
-  if (parentId === null) {
-    query = query.is('parent_id', null)
-  } else {
-    query = query.eq('parent_id', parentId)
-  }
-  const { data, error } = await query
-  if (error) throw error
-  return data
-}
-
-/**
- * Get a single category by slug
- * @param {string} slug
- * @returns {Promise<Object>}
- */
-export async function getCategoryBySlug(slug) {
-  const { data, error } = await supabase
-    .from('categories')
-    .select('*')
-    .eq('slug', slug)
-    .single()
-  if (error) throw error
-  return data
-}
-===== src/services/favoriteService.js =====
-
-import { supabase } from './supabaseClient'
-
-/**
- * Add a listing to favorites
- * @param {string} listingId
- * @returns {Promise<Object>}
- */
-export async function addFavorite(listingId) {
-  const { data, error } = await supabase
-    .from('favorites')
-    .insert({ listing_id: listingId })
-    .select()
-    .single()
-  if (error) throw error
-  return data
-}
-
-/**
- * Remove a listing from favorites
- * @param {string} listingId
- * @returns {Promise<void>}
- */
-export async function removeFavorite(listingId) {
-  const { error } = await supabase
-    .from('favorites')
-    .delete()
-    .eq('listing_id', listingId)
-  if (error) throw error
-}
-
-/**
- * Check if a listing is favorited by current user
- * @param {string} listingId
- * @returns {Promise<boolean>}
- */
-export async function isFavorite(listingId) {
-  const { data, error } = await supabase
-    .from('favorites')
-    .select('id')
-    .eq('listing_id', listingId)
-    .single()
-  if (error && error.code !== 'PGRST116') throw error // PGRST116 = no rows
-  return !!data
-}
-===== src/services/userService.js =====
-
-import { supabase } from './supabaseClient'
-
-/**
- * Get public profile by user ID
- * @param {string} userId
- * @returns {Promise<Object>}
- */
-export async function getPublicProfile(userId) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id, full_name, avatar_url, location, created_at')
-    .eq('id', userId)
-    .single()
-  if (error) throw error
-  return data
-}
-
-/**
- * Get seller's active listings
- * @param {string} userId
- * @returns {Promise<Array>}
- */
-export async function getSellerListings(userId) {
-  const { data, error } = await supabase
-    .from('listings')
-    .select(`
-      *,
-      listing_images (image_url, is_primary)
-    `)
-    .eq('user_id', userId)
-    .eq('status', 'active')
-    .order('created_at', { ascending: false })
-  if (error) throw error
-  return data
-}
-
-/**
- * Report a seller (placeholder)
- * @param {string} sellerId
- * @param {string} reason
- */
-export async function reportSeller(sellerId, reason) {
-  // This would typically insert into a reports table
-  console.log('Report seller:', sellerId, reason)
-  // For now, just log
-  return { success: true }
-}
-===== src/utils/constants.js =====
-
+}\n===== ./src/utils/constants.js =====\n
 export const ETHIOPIAN_CITIES = [
   'Addis Ababa', 'Dire Dawa', 'Mekelle', 'Gondar', 'Bahir Dar',
   'Hawassa', 'Adama', 'Jimma', 'Jijiga', 'Dessie', 'Others'
-];
-===== src/stores/authStore.js =====
-
+];\n===== ./src/stores/authStore.js =====\n
 import { create } from 'zustand'
 import { supabase } from '../services/supabaseClient'
 
@@ -3783,9 +3948,7 @@ const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
   useAuthStore.getState().setLoading(false)
 })
 
-export default useAuthStore
-===== src/stores/userStore.js =====
-
+export default useAuthStore\n===== ./src/stores/userStore.js =====\n
 import { create } from 'zustand'
 import { supabase } from '../services/supabaseClient'
 
@@ -3897,9 +4060,7 @@ const useUserStore = create((set, get) => ({
   },
 }))
 
-export default useUserStore
-===== src/stores/listingsStore.js =====
-
+export default useUserStore\n===== ./src/stores/listingsStore.js =====\n
 import { create } from 'zustand'
 import { supabase } from '../services/supabaseClient'
 
@@ -4007,4 +4168,94 @@ const useListingsStore = create((set, get) => ({
   },
 }))
 
-export default useListingsStore
+export default useListingsStore\n===== ./src/App.jsx =====\n
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import Layout from './components/Layout'
+import ProtectedRoute from './components/auth/ProtectedRoute'
+
+// Existing pages
+import Home from './pages/Home'
+import Login from './pages/auth/Login'
+import Register from './pages/Register'
+import ListingDetail from './pages/ListingDetail'
+import Profile from './pages/Profile'
+import Chat from './pages/Chat'
+import CompleteProfile from './pages/auth/CompleteProfile'
+import PostAd from './pages/PostAd'
+import CategoryPage from './pages/CategoryPage'
+import SearchPage from './pages/SearchPage'
+
+// New pages
+import MyListings from './pages/MyListings'
+import Favorites from './pages/Favorites'
+import SellerProfile from './pages/SellerProfile'
+console.log('supabase URL:',import.meta.env.VITE_SUPABASE_URL);
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/complete-profile" element={<CompleteProfile />} />
+          <Route
+            path="/post-ad"
+            element={
+              <ProtectedRoute requireCompleteProfile>
+                <PostAd />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/listing/:id" element={<ListingDetail />} />
+          <Route path="/category/:slug" element={<CategoryPage />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/my-listings"
+            element={
+              <ProtectedRoute>
+                <MyListings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/favorites"
+            element={
+              <ProtectedRoute>
+                <Favorites />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/seller/:userId" element={<SellerProfile />} />
+          <Route
+            path="/chat"
+            element={
+              <ProtectedRoute>
+                <Chat />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </Layout>
+    </BrowserRouter>
+  )
+}
+
+export default App\n===== ./vite.config.js =====\n
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+})

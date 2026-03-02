@@ -13,11 +13,12 @@ import CompleteProfile from './pages/auth/CompleteProfile'
 import PostAd from './pages/PostAd'
 import CategoryPage from './pages/CategoryPage'
 import SearchPage from './pages/SearchPage'
-
+import EditListing from './pages/EditListing'
 // New pages
 import MyListings from './pages/MyListings'
 import Favorites from './pages/Favorites'
 import SellerProfile from './pages/SellerProfile'
+console.log('supabase URL:',import.meta.env.VITE_SUPABASE_URL);
 
 function App() {
   return (
@@ -56,6 +57,14 @@ function App() {
             }
           />
           <Route
+              path="/edit-listing/:id"
+              element={
+                <ProtectedRoute>
+                  <EditListing />
+                </ProtectedRoute>
+              }
+            />
+                      <Route
             path="/favorites"
             element={
               <ProtectedRoute>

@@ -1,15 +1,17 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { Menu, X, User, LogOut, PlusCircle, Search, Heart } from 'lucide-react'
+import { Menu, X, User, LogOut, PlusCircle, Search, Heart, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useFavorites } from '../hooks/useFavorites'
 import CategoryDropdown from './categories/CategoryDropdown'
 import SearchBar from './search/SearchBar'
+//import {  Loader2} from 'lucide-react';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [signingOut, setSigningOut] = useState(false)
   const { user, profile, signOut } = useAuth()
   const { favoritesCount } = useFavorites()
   const navigate = useNavigate()
@@ -22,14 +24,20 @@ const Navbar = () => {
   }
 
   const handleSignOut = async () => {
+    setSigningOut(true);
     try {
-      await signOut()
-      navigate('/')
+      await signOut();
+      // Small delay to allow state to propagate
+      setTimeout(() => {
+        navigate('/', { replace: true });
+      }, 100);
     } catch (error) {
-      console.error('Sign out failed:', error)
+      console.error('Sign out failed:', error);
+      // You could show a toast here
+    } finally {
+      setSigningOut(false);
     }
-  }
-
+  };
   return (
     <nav className="bg-primary text-white shadow-lg sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -47,7 +55,7 @@ const Navbar = () => {
           {/* Desktop Menu */}
           <div className="hidden md:flex items-center space-x-4">
             <CategoryDropdown />
-            <SearchBar />
+            
             {/* Search form */}
             <form onSubmit={handleSearch} className="relative">
               <input
@@ -127,9 +135,14 @@ const Navbar = () => {
                       </Link>
                       <button
                         onClick={handleSignOut}
-                        className="block w-full text-left px-4 py-2 text-sm hover:bg-slate-50 text-error"
+                        disabled={signingOut}
+                        className="block w-full text-left px-4 py-2 text-sm hover:bg-slate-50 text-error disabled:opacity-50"
                       >
-                        <LogOut className="w-4 h-4 inline mr-2" />
+                        {signingOut ? (
+                          <Loader2 className="w-4 h-4 inline mr-2 animate-spin" />
+                        ) : (
+                          <LogOut className="w-4 h-4 inline mr-2" />
+                        )}
                         Sign Out
                       </button>
                     </div>
@@ -209,12 +222,17 @@ const Navbar = () => {
                 </Link>
                 <button
                   onClick={() => {
-                    handleSignOut()
-                    setIsOpen(false)
+                    handleSignOut();
+                    setIsOpen(false);
                   }}
-                  className="block w-full text-left px-3 py-2 rounded-md hover:bg-primary-600 transition"
+                  disabled={signingOut}
+                  className="block w-full text-left px-3 py-2 rounded-md hover:bg-primary-600 transition disabled:opacity-50"
                 >
-                  Sign Out
+                  {signingOut ? (
+                    <Loader2 className="w-4 h-4 inline mr-2 animate-spin" />
+                  ) : (
+                    'Sign Out'
+                  )}
                 </button>
               </>
             ) : (

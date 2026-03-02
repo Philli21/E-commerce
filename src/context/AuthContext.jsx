@@ -1,35 +1,98 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
+import { Loader2 } from 'lucide-react';
 
 const AuthContext = createContext({});
 
 /**
- * Provides authentication state and methods.
+ * Authentication context provider
  */
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => {
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          fetchProfile(session.user.id).finally(() => {
-            setLoading(false);
-          });
-        } else {
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        console.error('[Auth] getSession error:', err);
-        setLoading(false);
-      });
+  // ────────────────────────────────────────────────
+  // Fetch or create profile – tries to use Google data when available
+  // ────────────────────────────────────────────────
+  const fetchOrCreateProfile = async (userId) => {
+    if (!userId) return;
 
-    // Listen for auth state changes
+    console.log('[Auth] Loading profile for user:', userId);
+
+    try {
+      // 1. Try to fetch existing profile
+      let { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle(); // ← better than .single() when we expect 0 or 1 row
+
+      if (data) {
+        console.log('[Auth] Found existing profile');
+        setProfile(data);
+        return;
+      }
+
+      if (error && error.code !== 'PGRST116') {
+        throw error; // real error, not just "no rows"
+      }
+
+      // 2. No profile exists → create one
+      console.log('[Auth] Creating new profile');
+
+      const defaultProfile = {
+        id: userId,
+        full_name:
+          user?.user_metadata?.full_name ||
+          user?.user_metadata?.name ||
+          user?.email?.split('@')[0] ||
+          'New User',
+        avatar_url: user?.user_metadata?.avatar_url || null,
+        // phone_number: null,    // leave null – user should fill it later
+        // location: null,
+        updated_at: new Date().toISOString(),
+      };
+
+      ({ data, error } = await supabase
+        .from('profiles')
+        .insert(defaultProfile)
+        .select()
+        .single());
+
+      if (error) throw error;
+
+      console.log('[Auth] New profile created:', data.full_name);
+      setProfile(data);
+    } catch (err) {
+      console.error('[Auth] Profile fetch/create failed:', err.message);
+      setProfile(null);
+    }
+  };
+
+  // ────────────────────────────────────────────────
+  // Auth initialization + listener
+  // ────────────────────────────────────────────────
+  useEffect(() => {
+    // 1. Load initial session
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      console.log('[Auth] Initial session check:', session ? 'found' : 'none');
+
+      setUser(session?.user ?? null);
+
+      if (session?.user) {
+        await fetchOrCreateProfile(session.user.id);
+      } else {
+        setProfile(null);
+      }
+
+      setLoading(false);
+    }).catch((err) => {
+      console.error('[Auth] getSession failed:', err);
+      setLoading(false);
+    });
+
+    // 2. Listen for future auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('[Auth] Auth event:', event, session?.user?.id || 'no user');
@@ -37,17 +100,12 @@ export const AuthProvider = ({ children }) => {
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          try {
-            await fetchProfile(session.user.id);
-          } catch (err) {
-            console.error('[Auth] Profile fetch failed after auth change:', err);
-          } finally {
-            setLoading(false);
-          }
+          await fetchOrCreateProfile(session.user.id);
         } else {
           setProfile(null);
-          setLoading(false);
         }
+
+        setLoading(false);
       }
     );
 
@@ -56,76 +114,55 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  /**
-   * Fetch user profile from the 'profiles' table.
-   * @param {string} userId
-   * @returns {Promise<void>}
-   */
-  const fetchProfile = async (userId) => {
-    if (!userId) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        console.warn('[Auth] Profile fetch warning:', error.message);
-        // You might want to setProfile(null) here or handle "profile not found"
-        setProfile(null);
-      } else if (data) {
-        setProfile(data);
-      }
-    } catch (err) {
-      console.error('[Auth] Unexpected error fetching profile:', err);
-      setProfile(null);
-    }
-  };
-
+  // ────────────────────────────────────────────────
+  // Sign in with Google
+  // ────────────────────────────────────────────────
   const signInWithGoogle = async () => {
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin,
+          redirectTo: window.location.origin + '/complete-profile', // ← suggest redirect after first login
         },
       });
       if (error) throw error;
-      // Page will redirect — no need to setLoading(false) here
+      // Redirect happens automatically — no need to setLoading(false) here
     } catch (err) {
       console.error('[Auth] Google sign-in failed:', err);
       setLoading(false);
     }
   };
 
- const signOut = async () => {
-  console.log('[Auth] signOut called');
-  setLoading(true);
-  try {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error('[Auth] signOut error:', error);
-      setLoading(false);
-      throw error;
-    }
-    console.log('[Auth] signOut successful');
-    setUser(null);
-    setProfile(null);
-    setLoading(false);
-  } catch (err) {
-    console.error('[Auth] signOut exception:', err);
-    setLoading(false);
-    throw err;
-  }
-};
+  // ────────────────────────────────────────────────
+  // Sign out – with small delay for better UX
+  // ────────────────────────────────────────────────
+  const signOut = async () => {
+    console.log('[AuthContext] signOut started');
+    setLoading(true);
 
-  /**
-   * Update profile fields and refresh local state
-   * @param {Object} updates
-   */
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.warn('[AuthContext] Supabase signOut had warning:', error);
+      }
+
+      setUser(null);
+      setProfile(null);
+
+      // Small delay helps React Router / UI update smoothly
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    } catch (err) {
+      console.error('[AuthContext] signOut exception:', err);
+    } finally {
+      setLoading(false);
+      console.log('[AuthContext] signOut completed');
+    }
+  };
+
+  // ────────────────────────────────────────────────
+  // Update profile & refresh
+  // ────────────────────────────────────────────────
   const updateProfile = async (updates) => {
     if (!user?.id) {
       console.warn('[Auth] Cannot update profile: no user logged in');
@@ -135,13 +172,16 @@ export const AuthProvider = ({ children }) => {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update(updates)
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', user.id);
 
       if (error) throw error;
 
-      // Refresh local profile
-      await fetchProfile(user.id);
+      // Refresh local state
+      await fetchOrCreateProfile(user.id);
     } catch (err) {
       console.error('[Auth] Profile update failed:', err);
       throw err;
@@ -156,6 +196,23 @@ export const AuthProvider = ({ children }) => {
     signOut,
     updateProfile,
   };
+
+  // ────────────────────────────────────────────────
+  // Render: show loader while initializing / restoring session
+  // ────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+        <Loader2 className="w-16 h-16 text-primary animate-spin mb-6" />
+        <h2 className="text-xl font-medium text-gray-700 mb-2">
+          Restoring your session...
+        </h2>
+        <p className="text-gray-500 text-sm max-w-md text-center px-6">
+          Loading your profile and marketplace data. Please wait a moment.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <AuthContext.Provider value={value}>
