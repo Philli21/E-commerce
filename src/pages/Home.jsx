@@ -1,7 +1,10 @@
-import Hero from '../components/Hero'
-import CategoryGrid from '../components/categories/CategoryGrid'
-import ListingGrid from '../components/listings/ListingGrid'
-import { Package, MessageCircle, ThumbsUp } from 'lucide-react'
+import Hero from '../components/Hero';
+import CategoryGrid from '../components/categories/CategoryGrid';
+import ListingGrid from '../components/listings/ListingGrid';
+import { Package, MessageCircle, ThumbsUp } from 'lucide-react';
+
+// ✅ Stable empty object – same reference on every render
+const EMPTY_FILTERS = {};
 
 const Home = () => {
   return (
@@ -16,7 +19,8 @@ const Home = () => {
       <section className="py-12 bg-surface">
         <div className="container mx-auto px-4">
           <h2 className="text-2xl font-bold text-text mb-6">Recent Listings</h2>
-          <ListingGrid />
+          {/* ✅ Pass the stable empty object */}
+          <ListingGrid filters={EMPTY_FILTERS} />
         </div>
       </section>
       <section className="py-12">

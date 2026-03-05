@@ -11,31 +11,29 @@ const useListingsStore = create((set, get) => ({
    * @param {string} [status] - 'active', 'sold', 'reserved', 'inactive'
    */
   fetchUserListings: async (status) => {
-    set({ loading: true, error: null })
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
+  set({ loading: true, error: null });
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
 
-      let query = supabase
-        .from('listings')
-        .select(`
-          *,
-          listing_images (image_url, is_primary)
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+    let query = supabase
+      .from('listings')
+      .select('*, listing_images (image_url, is_primary)')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
 
-      if (status) {
-        query = query.eq('status', status)
-      }
+    if (status) query = query.eq('status', status);
 
-      const { data, error } = await query
-      if (error) throw error
-      set({ listings: data, loading: false })
-    } catch (error) {
-      set({ error: error.message, loading: false })
-    }
-  },
+    const { data, error } = await query;
+    if (error) throw error;
+
+    set({ listings: data });
+  } catch (error) {
+    set({ error: error.message });
+  } finally {
+    set({ loading: false }); // ✅ always runs
+  }
+},
 
   /**
    * Update listing status

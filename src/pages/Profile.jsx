@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useAuth } from '../context/AuthContext'
-import useUserStore from '../stores/userStore'
+import { useState } from 'react'
+import { useAuth } from '../context/AuthContext'  // ← ONLY useAuth
 import { useListings } from '../hooks/useListings'
 import { MapPin, Calendar, Star, Edit2 } from 'lucide-react'
 import { format } from 'date-fns'
@@ -8,28 +7,36 @@ import EditProfileModal from '../components/profile/EditProfileModal'
 import ListingGrid from '../components/listings/ListingGrid'
 
 const Profile = () => {
-  const { user } = useAuth()
-  const { profile, fetchProfile } = useUserStore()
+  const { user, profile, loading } = useAuth()  // ← Get profile from AuthContext
   const [activeTab, setActiveTab] = useState('listings')
   const [editModalOpen, setEditModalOpen] = useState(false)
 
-  // Fetch user's listings (active only for "Listings" tab)
-  const { listings, loading: listingsLoading } = useListings({ userId: user?.id, status: 'active' })
+  // Fetch user's listings
+  const { listings, loading: listingsLoading } = useListings({ 
+    userId: user?.id, 
+    status: 'active' 
+  })
 
-  useEffect(() => {
-    if (user?.id) {
-      fetchProfile(user.id)
-    }
-  }, [user])
+  // ❌ REMOVE this - no need to call fetchProfile anymore
+  // useEffect(() => {
+  //   if (user?.id) {
+  //     fetchProfile(user.id)
+  //   }
+  // }, [user])
 
-  if (!profile) {
-    return <div className="text-center py-12">Loading profile...</div>
+  // Show loading while auth is initializing
+  if (loading || !profile) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+        <p className="text-text-light">Loading your profile...</p>
+      </div>
+    )
   }
 
   // Stats
   const memberSince = format(new Date(profile.created_at), 'MMMM yyyy')
   const activeListingsCount = listings?.length || 0
-  // For sold items, we'd need another query or count from store; placeholder
   const soldItemsCount = 0
 
   return (
@@ -65,8 +72,9 @@ const Profile = () => {
               <span className="flex items-center gap-1">
                 <Calendar className="w-4 h-4" /> Member since {memberSince}
               </span>
-              {/* Verification badge placeholder */}
-              <span className="bg-primary-100 text-primary text-xs px-2 py-1 rounded-full">Verified</span>
+              <span className="bg-primary-100 text-primary text-xs px-2 py-1 rounded-full">
+                Verified
+              </span>
             </div>
           </div>
           <div className="flex gap-6">
@@ -120,7 +128,29 @@ const Profile = () => {
 
       {/* Tab content */}
       {activeTab === 'listings' && (
-        <ListingGrid listings={listings} loading={listingsLoading} />
+        <div>
+          {listingsLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="animate-pulse bg-slate-200 h-64 rounded-lg"></div>
+              ))}
+            </div>
+          ) : listings?.length > 0 ? (
+            <ListingGrid listings={listings} loading={false} />
+          ) : (
+            <div className="text-center py-12">
+              <h3 className="text-xl font-semibold mb-2">No active listings</h3>
+              <p className="text-text-light mb-4">You haven't posted any ads yet.</p>
+              <a
+                href="/post-ad"
+                className="bg-primary hover:bg-primary-600 text-white px-6 py-2 rounded-lg inline-flex items-center gap-2"
+              >
+                <Edit2 className="w-4 h-4" />
+                Post an Ad
+              </a>
+            </div>
+          )}
+        </div>
       )}
 
       {activeTab === 'reviews' && (
@@ -134,18 +164,17 @@ const Profile = () => {
       {activeTab === 'about' && (
         <div className="bg-surface p-6 rounded-lg border border-slate-100">
           <h3 className="font-semibold mb-2">About {profile.full_name}</h3>
-          <p className="text-text-light">
-            {/* Bio field not in schema yet; could be added later */}
-            This user hasn't added a bio yet.
-          </p>
+          <p className="text-text-light">This user hasn't added a bio yet.</p>
           <div className="mt-4">
             <h4 className="font-semibold mb-1">Contact</h4>
             <p className="text-text-light">Phone: {profile.phone_number || 'Not provided'}</p>
-            <p className="text-text-light">Location: {profile.location}</p>
+            <p className="text-text-light">Location: {profile.location || 'Not provided'}</p>
+            <p className="text-text-light">Email: {user?.email || 'Not provided'}</p>
           </div>
         </div>
       )}
 
+      {/* Edit Profile Modal */}
       <EditProfileModal
         isOpen={editModalOpen}
         onClose={() => setEditModalOpen(false)}

@@ -1,116 +1,226 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { Loader2 } from 'lucide-react';
 
 const AuthContext = createContext({});
 
-/**
- * Authentication context provider
- */
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // Use ref to track if we've already initialized to prevent race conditions
+  const isInitialized = useRef(false);
+  const isFetchingProfile = useRef(false);
+
+  console.log('🔵 [AUTH] AuthProvider render', {
+    loading,
+    hasUser: !!user,
+    hasProfile: !!profile,
+    isInitialized: isInitialized.current,
+    timestamp: new Date().toISOString()
+  });
 
   // ────────────────────────────────────────────────
-  // Fetch or create profile – tries to use Google data when available
+  // Fetch or create profile - with deduplication
   // ────────────────────────────────────────────────
-  const fetchOrCreateProfile = async (userId) => {
-    if (!userId) return;
-
-    console.log('[Auth] Loading profile for user:', userId);
+  const fetchOrCreateProfile = async (userId, userData = null) => {
+    if (!userId) {
+      console.log('🔴 [AUTH] fetchOrCreateProfile ABORTED - no userId');
+      return;
+    }
+    
+    // Prevent concurrent profile fetches
+    if (isFetchingProfile.current) {
+      console.log('🟡 [AUTH] fetchOrCreateProfile SKIPPED - already fetching');
+      return;
+    }
+    
+    isFetchingProfile.current = true;
+    console.log('🟢 [AUTH] fetchOrCreateProfile STARTED', { userId });
 
     try {
-      // 1. Try to fetch existing profile
+      // 1. Fetch existing profile from profiles table
       let { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .maybeSingle(); // ← better than .single() when we expect 0 or 1 row
+        .maybeSingle();
+
+      console.log('🟡 [AUTH] Profile fetch result', {
+        hasData: !!data,
+        hasError: !!error,
+        fullName: data?.full_name
+      });
 
       if (data) {
-        console.log('[Auth] Found existing profile');
+        console.log('✅ [AUTH] Profile FOUND:', data.full_name);
         setProfile(data);
         return;
       }
 
       if (error && error.code !== 'PGRST116') {
-        throw error; // real error, not just "no rows"
+        console.log('🔴 [AUTH] Profile fetch ERROR:', error);
+        throw error;
       }
 
       // 2. No profile exists → create one
-      console.log('[Auth] Creating new profile');
+      console.log('🟡 [AUTH] Creating new profile...');
 
-      const defaultProfile = {
+      const name = userData?.user_metadata?.full_name ||
+                   userData?.user_metadata?.name ||
+                   userData?.email?.split('@')[0] ||
+                   'User';
+
+      const avatar = userData?.user_metadata?.avatar_url || null;
+
+      const newProfile = {
         id: userId,
-        full_name:
-          user?.user_metadata?.full_name ||
-          user?.user_metadata?.name ||
-          user?.email?.split('@')[0] ||
-          'New User',
-        avatar_url: user?.user_metadata?.avatar_url || null,
-        // phone_number: null,    // leave null – user should fill it later
-        // location: null,
+        full_name: name,
+        avatar_url: avatar,
         updated_at: new Date().toISOString(),
       };
 
-      ({ data, error } = await supabase
+      const { data: created, error: insertError } = await supabase
         .from('profiles')
-        .insert(defaultProfile)
+        .insert(newProfile)
         .select()
-        .single());
+        .single();
 
-      if (error) throw error;
+      if (insertError) {
+        console.log('🔴 [AUTH] Profile insert ERROR:', insertError);
+        throw insertError;
+      }
 
-      console.log('[Auth] New profile created:', data.full_name);
-      setProfile(data);
+      console.log('✅ [AUTH] Profile CREATED:', created.full_name);
+      setProfile(created);
+
     } catch (err) {
-      console.error('[Auth] Profile fetch/create failed:', err.message);
+      console.log('🔴 [AUTH] fetchOrCreateProfile CAUGHT ERROR:', err.message);
       setProfile(null);
+    } finally {
+      isFetchingProfile.current = false;
+      console.log('🟢 [AUTH] fetchOrCreateProfile COMPLETED');
     }
   };
 
   // ────────────────────────────────────────────────
-  // Auth initialization + listener
+  // SINGLE useEffect for auth initialization
   // ────────────────────────────────────────────────
   useEffect(() => {
+    let isMounted = true;
+    let subscription = null;
+
+    console.log('🔵 [AUTH] useEffect STARTED');
+
     // 1. Load initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.log('[Auth] Initial session check:', session ? 'found' : 'none');
-
-      setUser(session?.user ?? null);
-
-      if (session?.user) {
-        await fetchOrCreateProfile(session.user.id);
-      } else {
-        setProfile(null);
+    const initializeAuth = async () => {
+      // Prevent double initialization
+      if (isInitialized.current) {
+        console.log('🟡 [AUTH] initializeAuth SKIPPED - already initialized');
+        return;
       }
+      
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        console.log('🟡 [AUTH] getSession RESOLVED', {
+          hasSession: !!session,
+          hasError: !!error,
+          userId: session?.user?.id
+        });
 
-      setLoading(false);
-    }).catch((err) => {
-      console.error('[Auth] getSession failed:', err);
-      setLoading(false);
-    });
+        if (!isMounted) {
+          console.log('🔴 [AUTH] Component unmounted - aborting');
+          return;
+        }
 
-    // 2. Listen for future auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('[Auth] Auth event:', event, session?.user?.id || 'no user');
-
-        setUser(session?.user ?? null);
+        if (error) {
+          console.log('🔴 [AUTH] getSession ERROR:', error);
+          setLoading(false);
+          isInitialized.current = true;
+          return;
+        }
 
         if (session?.user) {
-          await fetchOrCreateProfile(session.user.id);
+          console.log('✅ [AUTH] Session user found:', session.user.id);
+          setUser(session.user);
+          
+          // Wait for profile to be fetched before setting loading to false
+          await fetchOrCreateProfile(session.user.id, session.user);
         } else {
+          console.log('⚪ [AUTH] No session user');
+          setUser(null);
           setProfile(null);
         }
 
+        if (isMounted) {
+          console.log('🟡 [AUTH] Setting loading = false (initial)');
+          setLoading(false);
+          isInitialized.current = true;
+        }
+      } catch (err) {
+        console.log('🔴 [AUTH] getSession REJECTED:', err.message);
+        if (isMounted) {
+          setLoading(false);
+          isInitialized.current = true;
+        }
+      }
+    };
+
+    // 2. Listen for auth changes
+    console.log('🟡 [AUTH] Setting up onAuthStateChange listener...');
+
+    const { data: { subscription: sub } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('🟣 [AUTH] onAuthStateChange TRIGGERED', {
+          event,
+          hasSession: !!session,
+          userId: session?.user?.id,
+          isInitialized: isInitialized.current
+        });
+
+        if (!isMounted) {
+          console.log('🔴 [AUTH] Component unmounted - ignoring');
+          return;
+        }
+
+        // Skip INITIAL_SESSION - getSession() already handled it
+        if (event === 'INITIAL_SESSION') {
+          console.log('🟡 [AUTH] Skipping INITIAL_SESSION - already handled by getSession');
+          return;
+        }
+
+        if (session?.user) {
+          console.log('✅ [AUTH] Auth event - user present');
+          setUser(session.user);
+          await fetchOrCreateProfile(session.user.id, session.user);
+        } else {
+          console.log('⚪ [AUTH] Auth event - no user (logged out)');
+          setUser(null);
+          setProfile(null);
+        }
+
+        console.log('🟡 [AUTH] Setting loading = false (listener)');
         setLoading(false);
+        console.log('🟣 [AUTH] Auth event handler COMPLETED');
       }
     );
 
+    subscription = sub;
+    
+    // Start initialization AFTER setting up listener
+    initializeAuth();
+
+    // Cleanup
     return () => {
-      subscription.unsubscribe();
+      console.log('🔴 [AUTH] useEffect CLEANUP running');
+      isMounted = false;
+      if (subscription) {
+        subscription.unsubscribe();
+        console.log('🔴 [AUTH] Auth listener unsubscribed');
+      }
+      console.log('🔴 [AUTH] Cleanup COMPLETED');
     };
   }, []);
 
@@ -118,56 +228,49 @@ export const AuthProvider = ({ children }) => {
   // Sign in with Google
   // ────────────────────────────────────────────────
   const signInWithGoogle = async () => {
-    setLoading(true);
+    console.log('🟢 [AUTH] signInWithGoogle STARTED');
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin + '/complete-profile', // ← suggest redirect after first login
+          redirectTo: window.location.origin + '/complete-profile',
         },
       });
       if (error) throw error;
-      // Redirect happens automatically — no need to setLoading(false) here
     } catch (err) {
-      console.error('[Auth] Google sign-in failed:', err);
+      console.log('🔴 [AUTH] Google sign-in FAILED:', err.message);
       setLoading(false);
     }
   };
 
   // ────────────────────────────────────────────────
-  // Sign out – with small delay for better UX
+  // Sign out
   // ────────────────────────────────────────────────
   const signOut = async () => {
-    console.log('[AuthContext] signOut started');
-    setLoading(true);
-
+    console.log('🟢 [AUTH] signOut STARTED');
     try {
       const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.warn('[AuthContext] Supabase signOut had warning:', error);
-      }
-
+      if (error) console.warn('⚠️ [AUTH] signOut warning:', error);
       setUser(null);
       setProfile(null);
-
-      // Small delay helps React Router / UI update smoothly
-      await new Promise((resolve) => setTimeout(resolve, 300));
     } catch (err) {
-      console.error('[AuthContext] signOut exception:', err);
+      console.log('🔴 [AUTH] signOut ERROR:', err.message);
     } finally {
       setLoading(false);
-      console.log('[AuthContext] signOut completed');
+      console.log('🟢 [AUTH] signOut FINISHED');
     }
   };
 
   // ────────────────────────────────────────────────
-  // Update profile & refresh
+  // Update profile
   // ────────────────────────────────────────────────
   const updateProfile = async (updates) => {
     if (!user?.id) {
-      console.warn('[Auth] Cannot update profile: no user logged in');
+      console.log('🔴 [AUTH] updateProfile ABORTED - no user');
       return;
     }
+
+    console.log('🟢 [AUTH] updateProfile STARTED', { updates });
 
     try {
       const { error } = await supabase
@@ -180,10 +283,11 @@ export const AuthProvider = ({ children }) => {
 
       if (error) throw error;
 
-      // Refresh local state
+      console.log('✅ [AUTH] Profile updated - refreshing...');
       await fetchOrCreateProfile(user.id);
+
     } catch (err) {
-      console.error('[Auth] Profile update failed:', err);
+      console.log('🔴 [AUTH] updateProfile FAILED:', err.message);
       throw err;
     }
   };
@@ -197,10 +301,17 @@ export const AuthProvider = ({ children }) => {
     updateProfile,
   };
 
+  console.log('🔵 [AUTH] Context value prepared', {
+    hasUser: !!user,
+    hasProfile: !!profile,
+    loading
+  });
+
   // ────────────────────────────────────────────────
-  // Render: show loader while initializing / restoring session
+  // Render loading state
   // ────────────────────────────────────────────────
   if (loading) {
+    console.log('⏳ [AUTH] RENDERING LOADING SCREEN');
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
         <Loader2 className="w-16 h-16 text-primary animate-spin mb-6" />
@@ -210,9 +321,14 @@ export const AuthProvider = ({ children }) => {
         <p className="text-gray-500 text-sm max-w-md text-center px-6">
           Loading your profile and marketplace data. Please wait a moment.
         </p>
+        <div className="mt-4 text-xs text-gray-400">
+          Debug: loading={loading.toString()}, user={!!user}, profile={!!profile}
+        </div>
       </div>
     );
   }
+
+  console.log('✅ [AUTH] RENDERING CHILDREN - Auth ready');
 
   return (
     <AuthContext.Provider value={value}>
@@ -224,7 +340,13 @@ export const AuthProvider = ({ children }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
+    console.log('🔴 [AUTH] useAuth called outside AuthProvider!');
     throw new Error('useAuth must be used within an AuthProvider');
   }
+  console.log('🔵 [AUTH] useAuth hook called', {
+    hasUser: !!context.user,
+    hasProfile: !!context.profile,
+    loading: context.loading
+  });
   return context;
 };

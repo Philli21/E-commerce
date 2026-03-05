@@ -1,21 +1,17 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Loader2, MapPin, Phone, Camera } from 'lucide-react'
 import { supabase } from '../../services/supabaseClient'
 
-// Ethiopian cities (as defined in the database schema)
+// Ethiopian cities (keep this or move to constants file later)
 const ETHIOPIAN_CITIES = [
   'Addis Ababa', 'Dire Dawa', 'Mekelle', 'Gondar', 'Bahir Dar',
   'Hawassa', 'Adama', 'Jimma', 'Jijiga', 'Dessie', 'Others'
 ]
 
-/**
- * Page for new users to complete their profile after first Google sign-in.
- * @returns {JSX.Element}
- */
 const CompleteProfile = () => {
-  const { user, profile, updateProfile, loading } = useAuth()
+  const { user, profile, updateProfile, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const from = location.state?.from?.pathname || '/'
@@ -27,10 +23,35 @@ const CompleteProfile = () => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  // If profile already has required fields, redirect
-  if (!loading && profile?.phone_number && profile?.location) {
-    navigate(from, { replace: true })
-    return null
+  // ────────────────────────────────────────────────
+  // Redirect if profile is already complete
+  // This runs AFTER render, only when dependencies change
+  // ────────────────────────────────────────────────
+  useEffect(() => {
+    // Wait until auth is done loading
+    if (authLoading) return
+
+    // If user is not logged in → shouldn't be here, but safety
+    if (!user) {
+      navigate('/login', { replace: true })
+      return
+    }
+
+    // If profile already has required fields → redirect away
+    if (profile?.phone_number && profile?.location) {
+      console.log('[CompleteProfile] Profile complete → redirecting to:', from)
+      navigate(from, { replace: true })
+    }
+  }, [authLoading, user, profile, from, navigate])
+
+  // Show loader while auth is still initializing
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-12 h-12 text-primary animate-spin" />
+        <p className="ml-4 text-lg">Loading your profile...</p>
+      </div>
+    )
   }
 
   const handleAvatarChange = (e) => {
@@ -38,9 +59,7 @@ const CompleteProfile = () => {
     if (file) {
       setAvatarFile(file)
       const reader = new FileReader()
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result)
-      }
+      reader.onloadend = () => setAvatarPreview(reader.result)
       reader.readAsDataURL(file)
     }
   }
@@ -56,9 +75,7 @@ const CompleteProfile = () => {
       .from('avatars')
       .upload(filePath, avatarFile)
 
-    if (uploadError) {
-      throw new Error('Avatar upload failed')
-    }
+    if (uploadError) throw new Error('Avatar upload failed: ' + uploadError.message)
 
     const { data } = supabase.storage.from('avatars').getPublicUrl(filePath)
     return data.publicUrl
@@ -76,14 +93,15 @@ const CompleteProfile = () => {
       }
 
       await updateProfile({
-        phone_number: phoneNumber,
+        phone_number: phoneNumber.trim() || null,
         location: city,
         avatar_url: avatarUrl,
       })
 
       navigate(from, { replace: true })
     } catch (err) {
-      setError(err.message)
+      console.error('Profile completion error:', err)
+      setError(err.message || 'Failed to save profile. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -132,7 +150,7 @@ const CompleteProfile = () => {
                 />
               </label>
             </div>
-            <p className="text-xs text-text-light">Click the camera to change photo</p>
+            <p className="text-xs text-text-light">Click the camera to change photo (optional)</p>
           </div>
 
           {/* Phone number */}
@@ -181,8 +199,8 @@ const CompleteProfile = () => {
 
           <button
             type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-primary hover:bg-primary-600 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center"
+            disabled={isSubmitting || !city}
+            className="w-full bg-primary hover:bg-primary-600 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center disabled:opacity-50"
           >
             {isSubmitting ? (
               <>
