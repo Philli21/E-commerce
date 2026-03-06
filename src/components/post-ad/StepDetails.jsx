@@ -1,29 +1,34 @@
-import { useState } from 'react'
-import { MapPin, DollarSign } from 'lucide-react'
+// src/components/post-ad/StepDetails.jsx
+import { useState } from 'react';
+import { MapPin, DollarSign } from 'lucide-react';
+import CategorySpecFields from './CategorySpecFields';
 
 const ETHIOPIAN_CITIES = [
   'Addis Ababa', 'Dire Dawa', 'Mekelle', 'Gondar', 'Bahir Dar',
   'Hawassa', 'Adama', 'Jimma', 'Jijiga', 'Dessie', 'Others'
-]
+];
 
 const StepDetails = ({ formData, updateForm, onNext, onBack }) => {
-  const [errors, setErrors] = useState({})
+  const [errors, setErrors] = useState({});
+  const [specifications, setSpecifications] = useState(formData.specifications || {});
 
   const validate = () => {
-    const newErrors = {}
-    if (!formData.title.trim()) newErrors.title = 'Title is required'
-    if (!formData.description.trim()) newErrors.description = 'Description is required'
-    if (!formData.price || parseFloat(formData.price) <= 0) newErrors.price = 'Valid price is required'
-    if (!formData.location) newErrors.location = 'Location is required'
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
+    const newErrors = {};
+    if (!formData.title.trim()) newErrors.title = 'Title is required';
+    if (!formData.description.trim()) newErrors.description = 'Description is required';
+    if (!formData.price || parseFloat(formData.price) <= 0) newErrors.price = 'Valid price is required';
+    if (!formData.location) newErrors.location = 'Location is required';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleNext = () => {
+    // Include specifications in formData
+    updateForm({ ...formData, specifications });
     if (validate()) {
-      onNext()
+      onNext();
     }
-  }
+  };
 
   return (
     <div>
@@ -118,25 +123,34 @@ const StepDetails = ({ formData, updateForm, onNext, onBack }) => {
           {errors.location && <p className="text-error text-sm mt-1">{errors.location}</p>}
         </div>
 
+        {/* Dynamic specifications based on category */}
+        {formData.category_id && (
+          <CategorySpecFields
+            categoryId={formData.category_id}
+            specifications={specifications}
+            onChange={setSpecifications}
+          />
+        )}
+
         <div className="flex justify-between pt-6">
           <button
             type="button"
             onClick={onBack}
-            className="px-6 py-2 border border-slate-200 rounded-lg hover:bg-slate-50"
+            className="px-6 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 transition active:scale-95"
           >
             Back
           </button>
           <button
             type="button"
             onClick={handleNext}
-            className="bg-primary hover:bg-primary-600 text-white px-6 py-2 rounded-lg"
+            className="bg-primary hover:bg-primary-600 text-white px-6 py-2 rounded-lg transition active:scale-95"
           >
             Next: Images
           </button>
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default StepDetails
+export default StepDetails;

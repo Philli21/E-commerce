@@ -1,3 +1,5 @@
+// src/pages/Home.jsx
+import { Helmet } from 'react-helmet-async';
 import Hero from '../components/Hero';
 import CategoryGrid from '../components/categories/CategoryGrid';
 import ListingGrid from '../components/listings/ListingGrid';
@@ -9,6 +11,10 @@ const EMPTY_FILTERS = {};
 const Home = () => {
   return (
     <>
+      <Helmet>
+        <title>Midnight Bazaar - Ethiopian Marketplace</title>
+        <meta name="description" content="Discover & Sell in Ethiopia's Marketplace – Find everything from traditional crafts to modern gadgets." />
+      </Helmet>
       <Hero />
       <section className="py-12">
         <div className="container mx-auto px-4">
@@ -52,7 +58,7 @@ const Home = () => {
         </div>
       </section>
     </>
-  )
-}
+  );
+};
 
-export default Home
+export default Home;

@@ -1,25 +1,27 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import useListingsStore from '../stores/listingsStore'
-import ListingManagementCard from '../components/listings/ListingManagementCard'
-import { PlusCircle } from 'lucide-react'
+// src/pages/MyListings.jsx
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import useListingsStore from '../stores/listingsStore';
+import ListingManagementCard from '../components/listings/ListingManagementCard';
+import EmptyState from '../components/common/EmptyState';
+import { PlusCircle } from 'lucide-react';
 
 const STATUS_TABS = [
   { value: 'active', label: 'Active' },
   { value: 'sold', label: 'Sold' },
   { value: 'reserved', label: 'Reserved' },
   { value: 'inactive', label: 'Drafts' },
-]
+];
 
 const MyListings = () => {
-  const [activeTab, setActiveTab] = useState('active')
-  const { listings, fetchUserListings, loading } = useListingsStore()
+  const [activeTab, setActiveTab] = useState('active');
+  const { listings, fetchUserListings, loading } = useListingsStore();
 
   useEffect(() => {
-    fetchUserListings(activeTab)
-  }, [activeTab])
+    fetchUserListings(activeTab);
+  }, [activeTab, fetchUserListings]);
 
-  const filteredListings = listings.filter(l => l.status === activeTab)
+  const filteredListings = listings.filter(l => l.status === activeTab);
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -27,7 +29,7 @@ const MyListings = () => {
         <h1 className="text-3xl font-bold">My Listings</h1>
         <Link
           to="/post-ad"
-          className="bg-secondary hover:bg-secondary-600 text-white font-semibold px-4 py-2 rounded-lg transition flex items-center gap-2"
+          className="bg-secondary hover:bg-secondary-600 text-white font-semibold px-4 py-2 rounded-lg transition flex items-center gap-2 active:scale-95"
         >
           <PlusCircle className="w-5 h-5" />
           Post New Ad
@@ -60,23 +62,25 @@ const MyListings = () => {
           ))}
         </div>
       ) : filteredListings.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="text-6xl mb-4">📭</div>
-          <h3 className="text-xl font-semibold mb-2">No {activeTab} listings</h3>
-          <p className="text-text-light mb-4">
-            {activeTab === 'active' && "You haven't posted any active ads yet."}
-            {activeTab === 'sold' && "You haven't sold any items yet."}
-            {activeTab === 'reserved' && "You don't have any reserved items."}
-            {activeTab === 'inactive' && "You don't have any drafts."}
-          </p>
-          <Link
-            to="/post-ad"
-            className="bg-primary hover:bg-primary-600 text-white px-6 py-2 rounded-lg inline-flex items-center gap-2"
-          >
-            <PlusCircle className="w-5 h-5" />
-            Post an Ad
-          </Link>
-        </div>
+        <EmptyState
+          icon={PlusCircle}
+          title={`No ${activeTab} listings`}
+          message={
+            activeTab === 'active' ? "You haven't posted any active ads yet." :
+            activeTab === 'sold' ? "You haven't sold any items yet." :
+            activeTab === 'reserved' ? "You don't have any reserved items." :
+            "You don't have any drafts."
+          }
+          action={
+            <Link
+              to="/post-ad"
+              className="bg-primary hover:bg-primary-600 text-white px-6 py-2 rounded-lg inline-flex items-center gap-2 transition active:scale-95"
+            >
+              <PlusCircle className="w-5 h-5" />
+              Post an Ad
+            </Link>
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredListings.map(listing => (
@@ -85,7 +89,7 @@ const MyListings = () => {
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
-export default MyListings
+export default MyListings;

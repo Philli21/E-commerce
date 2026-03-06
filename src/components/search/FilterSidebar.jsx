@@ -1,14 +1,15 @@
-import { useState } from 'react'
-import { ETHIOPIAN_CITIES } from '../../utils/constants' // define elsewhere
+// src/components/search/FilterSidebar.jsx
+import { useState } from 'react';
+import { ETHIOPIAN_CITIES } from '../../utils/constants';
 
-const FilterSidebar = ({ categoryId }) => {
-  const [minPrice, setMinPrice] = useState('')
-  const [maxPrice, setMaxPrice] = useState('')
-  const [location, setLocation] = useState('')
-  const [condition, setCondition] = useState('')
+const FilterSidebar = ({ categoryId, onFilterChange }) => {
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [location, setLocation] = useState('');
+  const [condition, setCondition] = useState('');
 
-  // This component would apply filters via a callback or URL params.
-  // For brevity, we'll just render the inputs.
+  // In a future update, we can add dynamic spec filters based on categoryId
+  // For now, only basic filters are implemented.
 
   return (
     <div className="bg-surface p-6 rounded-xl border border-slate-100">
@@ -22,14 +23,14 @@ const FilterSidebar = ({ categoryId }) => {
               placeholder="Min"
               value={minPrice}
               onChange={(e) => setMinPrice(e.target.value)}
-              className="w-1/2 px-3 py-2 border border-slate-200 rounded-lg"
+              className="w-1/2 px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary"
             />
             <input
               type="number"
               placeholder="Max"
               value={maxPrice}
               onChange={(e) => setMaxPrice(e.target.value)}
-              className="w-1/2 px-3 py-2 border border-slate-200 rounded-lg"
+              className="w-1/2 px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary"
             />
           </div>
         </div>
@@ -38,7 +39,7 @@ const FilterSidebar = ({ categoryId }) => {
           <select
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-200 rounded-lg"
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary"
           >
             <option value="">All</option>
             {ETHIOPIAN_CITIES.map(city => (
@@ -51,7 +52,7 @@ const FilterSidebar = ({ categoryId }) => {
           <select
             value={condition}
             onChange={(e) => setCondition(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-200 rounded-lg"
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary"
           >
             <option value="">All</option>
             <option value="new">New</option>
@@ -59,9 +60,15 @@ const FilterSidebar = ({ categoryId }) => {
             <option value="refurbished">Refurbished</option>
           </select>
         </div>
+        {/* Placeholder for spec filters */}
+        {categoryId && (
+          <p className="text-xs text-text-light border-t pt-4">
+            Additional category-specific filters coming soon.
+          </p>
+        )}
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default FilterSidebar
+export default FilterSidebar;

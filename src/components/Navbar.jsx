@@ -1,43 +1,46 @@
-import { Link, useNavigate } from 'react-router-dom'
-import { Menu, X, User, LogOut, PlusCircle, Search, Heart, Loader2 } from 'lucide-react'
-import { useState } from 'react'
-import { useAuth } from '../context/AuthContext'
-import { useFavorites } from '../hooks/useFavorites'
-import CategoryDropdown from './categories/CategoryDropdown'
-import SearchBar from './search/SearchBar'
-//import {  Loader2} from 'lucide-react';
+// src/components/Navbar.jsx
+import { Link, useNavigate } from 'react-router-dom';
+import { Menu, X, User, LogOut, PlusCircle, Search, Heart, Loader2, MessageCircle } from 'lucide-react';
+import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { useFavorites } from '../hooks/useFavorites';
+import { useChat } from '../stores/chatStore';
+import CategoryDropdown from './categories/CategoryDropdown';
+import toast from 'react-hot-toast';
 
 const Navbar = () => {
-  const [isOpen, setIsOpen] = useState(false)
-  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [signingOut, setSigningOut] = useState(false)
-  const { user, profile, signOut } = useAuth()
-  const { favoritesCount } = useFavorites()
-  const navigate = useNavigate()
+  const [isOpen, setIsOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [signingOut, setSigningOut] = useState(false);
+  const { user, profile, signOut } = useAuth();
+  const { favoritesCount } = useFavorites();
+  const { unreadCount } = useChat();
+  const navigate = useNavigate();
 
   const handleSearch = (e) => {
-    e.preventDefault()
+    e.preventDefault();
     if (searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery)}`)
+      navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
     }
-  }
+  };
 
   const handleSignOut = async () => {
     setSigningOut(true);
     try {
       await signOut();
-      // Small delay to allow state to propagate
+      toast.success('Signed out successfully');
       setTimeout(() => {
         navigate('/', { replace: true });
       }, 100);
     } catch (error) {
+      toast.error('Sign out failed');
       console.error('Sign out failed:', error);
-      // You could show a toast here
     } finally {
       setSigningOut(false);
     }
   };
+
   return (
     <nav className="bg-primary text-white shadow-lg sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -78,6 +81,16 @@ const Navbar = () => {
                 >
                   <PlusCircle className="w-4 h-4" />
                   Post Free Ad
+                </Link>
+
+                {/* Chat link with unread badge */}
+                <Link to="/chat" className="relative hover:bg-primary-600 px-3 py-2 rounded-md transition">
+                  <MessageCircle className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
                 </Link>
 
                 {/* Profile dropdown */}
@@ -200,6 +213,18 @@ const Navbar = () => {
                   Post Free Ad
                 </Link>
                 <Link
+                  to="/chat"
+                  className="block px-3 py-2 rounded-md hover:bg-primary-600 transition flex items-center justify-between"
+                  onClick={() => setIsOpen(false)}
+                >
+                  <span>Chat</span>
+                  {unreadCount > 0 && (
+                    <span className="bg-red-500 text-white text-xs rounded-full px-2 py-0.5">
+                      {unreadCount}
+                    </span>
+                  )}
+                </Link>
+                <Link
                   to="/profile"
                   className="block px-3 py-2 rounded-md hover:bg-primary-600 transition"
                   onClick={() => setIsOpen(false)}
@@ -257,7 +282,7 @@ const Navbar = () => {
         )}
       </div>
     </nav>
-  )
-}
+  );
+};
 
-export default Navbar
+export default Navbar;

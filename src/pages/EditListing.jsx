@@ -1,5 +1,8 @@
+// src/pages/EditListing.jsx
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
+import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { getListingById, updateListing } from '../services/listingService';
 import { Loader2, X, Star, Upload } from 'lucide-react';
@@ -36,12 +39,10 @@ const EditListing = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Fetch listing data
   useEffect(() => {
     const fetchListing = async () => {
       try {
         const data = await getListingById(id);
-        // Ensure user owns this listing (protect route)
         if (data.user_id !== user?.id) {
           navigate('/my-listings');
           return;
@@ -60,6 +61,7 @@ const EditListing = () => {
         });
       } catch (err) {
         setError(err.message);
+        toast.error('Failed to load listing');
       } finally {
         setLoading(false);
       }
@@ -72,12 +74,11 @@ const EditListing = () => {
   const handleNext = () => setCurrentStep(i => i + 1);
   const handleBack = () => setCurrentStep(i => i - 1);
 
-  // ---- Image management for step 2 ----
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
     const totalImages = formData.existingImages.length + formData.newImages.length + files.length;
     if (totalImages > 8) {
-      alert('Maximum 8 images allowed');
+      toast.error('Maximum 8 images allowed');
       return;
     }
     updateForm({ newImages: [...formData.newImages, ...files] });
@@ -113,9 +114,11 @@ const EditListing = () => {
     setSubmitting(true);
     try {
       await updateListing(id, formData);
+      toast.success('Listing updated successfully!');
       navigate('/my-listings');
     } catch (err) {
       setError(err.message);
+      toast.error('Failed to update listing');
       setSubmitting(false);
     }
   };
@@ -132,7 +135,6 @@ const EditListing = () => {
     return <div className="text-center py-12 text-error">{error}</div>;
   }
 
-  // Render step components
   const stepProps = {
     formData,
     updateForm,
@@ -258,34 +260,39 @@ const EditListing = () => {
   };
 
   return (
-    <div className="max-w-3xl mx-auto py-8 px-4">
-      {/* Stepper */}
-      <div className="mb-8">
-        <div className="flex justify-between items-center">
-          {steps.map((step, idx) => (
-            <div key={idx} className="flex items-center flex-1 last:flex-none">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold ${
-                  idx <= currentStep
-                    ? 'bg-primary text-white'
-                    : 'bg-slate-200 text-text-light'
-                }`}
-              >
-                {idx + 1}
+    <>
+      <Helmet>
+        <title>Edit Listing | Midnight Bazaar</title>
+      </Helmet>
+      <div className="max-w-3xl mx-auto py-8 px-4">
+        {/* Stepper */}
+        <div className="mb-8">
+          <div className="flex justify-between items-center">
+            {steps.map((step, idx) => (
+              <div key={idx} className="flex items-center flex-1 last:flex-none">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold ${
+                    idx <= currentStep
+                      ? 'bg-primary text-white'
+                      : 'bg-slate-200 text-text-light'
+                  }`}
+                >
+                  {idx + 1}
+                </div>
+                <span className={`ml-2 text-sm ${idx === currentStep ? 'font-medium text-text' : 'text-text-light'}`}>
+                  {step}
+                </span>
+                {idx < steps.length - 1 && (
+                  <div className={`flex-1 h-0.5 mx-4 ${idx < currentStep ? 'bg-primary' : 'bg-slate-200'}`} />
+                )}
               </div>
-              <span className={`ml-2 text-sm ${idx === currentStep ? 'font-medium text-text' : 'text-text-light'}`}>
-                {step}
-              </span>
-              {idx < steps.length - 1 && (
-                <div className={`flex-1 h-0.5 mx-4 ${idx < currentStep ? 'bg-primary' : 'bg-slate-200'}`} />
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
 
-      {renderStep()}
-    </div>
+        {renderStep()}
+      </div>
+    </>
   );
 };
 

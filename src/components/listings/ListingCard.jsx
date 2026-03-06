@@ -1,58 +1,56 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { MapPin, Heart } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
-import { useFavorites } from '../../hooks/useFavorites'
+// src/components/listings/ListingCard.jsx
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { MapPin, Heart } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import { useFavorites } from '../../hooks/useFavorites';
 
-/**
- * Listing card with hover image carousel.
- * @param {Object} listing
- * @param {Array} listing.listing_images
- * @param {string} listing.title
- * @param {number} listing.price
- * @param {string} listing.location
- * @param {string} listing.condition
- * @param {string} listing.created_at
- * @returns {JSX.Element}
- */
 const ListingCard = ({ listing }) => {
-  const { isFavorited, toggleFavorite } = useFavorites()
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [hovering, setHovering] = useState(false)
+  const { isFavorited, toggleFavorite } = useFavorites();
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [hovering, setHovering] = useState(false);
+  const [heartPulse, setHeartPulse] = useState(false);
 
-  const images = listing.listing_images || []
-  const mainImage = images.find(img => img.is_primary) || images[0]
-  const otherImages = images.filter(img => !img.is_primary)
+  const images = listing.listing_images || [];
+  const mainImage = images.find(img => img.is_primary) || images[0];
+  const otherImages = images.filter(img => !img.is_primary);
 
   useEffect(() => {
-    if (!hovering || otherImages.length === 0) return
+    if (!hovering || otherImages.length === 0) return;
     const interval = setInterval(() => {
-      setCurrentImageIndex(prev => (prev + 1) % (otherImages.length + 1))
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [hovering, otherImages.length])
+      setCurrentImageIndex(prev => (prev + 1) % (otherImages.length + 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [hovering, otherImages.length]);
 
   const displayedImage = currentImageIndex === 0
     ? mainImage?.image_url
-    : otherImages[currentImageIndex - 1]?.image_url
+    : otherImages[currentImageIndex - 1]?.image_url;
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('en-ET', {
       style: 'currency',
       currency: 'ETB',
       minimumFractionDigits: 0,
-    }).format(price)
-  }
+    }).format(price);
+  };
 
-  const timeAgo = formatDistanceToNow(new Date(listing.created_at), { addSuffix: true })
+  const timeAgo = formatDistanceToNow(new Date(listing.created_at), { addSuffix: true });
+
+  const handleFavoriteClick = (e) => {
+    e.preventDefault();
+    setHeartPulse(true);
+    setTimeout(() => setHeartPulse(false), 300);
+    toggleFavorite(listing.id);
+  };
 
   return (
     <div
       className="bg-surface rounded-xl shadow-sm hover:shadow-lg transition overflow-hidden border border-slate-100"
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => {
-        setHovering(false)
-        setCurrentImageIndex(0)
+        setHovering(false);
+        setCurrentImageIndex(0);
       }}
     >
       <Link to={`/listing/${listing.id}`} className="block relative aspect-square">
@@ -61,6 +59,7 @@ const ListingCard = ({ listing }) => {
             src={displayedImage}
             alt={listing.title}
             className="w-full h-full object-cover"
+            loading="lazy"
           />
         ) : (
           <div className="w-full h-full bg-slate-200 flex items-center justify-center">
@@ -68,16 +67,14 @@ const ListingCard = ({ listing }) => {
           </div>
         )}
         <button
-          onClick={(e) => {
-            e.preventDefault()
-            toggleFavorite(listing.id)
-          }}
-          className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md hover:bg-slate-100"
+          onClick={handleFavoriteClick}
+          className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md hover:bg-slate-100 transition active:scale-95"
+          aria-label={isFavorited(listing.id) ? 'Remove from favorites' : 'Add to favorites'}
         >
           <Heart
             className={`w-5 h-5 ${
               isFavorited(listing.id) ? 'fill-error text-error' : 'text-text-light'
-            }`}
+            } ${heartPulse ? 'heart-pulse' : ''}`}
           />
         </button>
         <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
@@ -101,7 +98,7 @@ const ListingCard = ({ listing }) => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default ListingCard
+export default ListingCard;
